@@ -52,4 +52,4 @@ Which outputs the following Markdown result:
 
 ## Thanks
 
-@Andoryuuta for helping to write this all while 🛶 Canoeing across the atlantic.
+[@Andoryuuta](https://github.com/Andoryuuta) for helping to write this all while 🛶 Canoeing across the atlantic.
