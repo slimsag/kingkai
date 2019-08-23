@@ -105,7 +105,7 @@ func main() {
 			formatDurationDifference(beforeMetrics.Latencies.P95, afterMetrics.Latencies.P95),
 			formatDurationDifference(beforeMetrics.Latencies.P99, afterMetrics.Latencies.P99),
 			formatDurationDifference(beforeMetrics.Latencies.Max, afterMetrics.Latencies.Max),
-			fmt.Sprintf("%v%% → %v%%", beforeMetrics.Success, afterMetrics.Success),
+			fmt.Sprintf("%.2f%% → %.2f%%", beforeMetrics.Success, afterMetrics.Success),
 		)
 		fmt.Println("")
 	}
