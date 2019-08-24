@@ -100,10 +100,12 @@ func main() {
 	// Go over each file and get and compare the before/after metrics.
 	for _, b := range benchmarks {
 		// Helper function for formatting the duration difference strings.
-		formatDurationDifference := func(before time.Duration, after time.Duration) string {
-			before = before.Round(time.Millisecond)
-			after = after.Round(time.Millisecond)
-			return fmt.Sprintf("%v → %v (%.2f%%)", before, after, percentageIncrease(float32(before), float32(after)))
+		formatDurationDifference := func(before, after time.Duration) string {
+			return fmt.Sprintf("%v → %v (%.2f%%)",
+				before.Round(time.Millisecond),
+				after.Round(time.Millisecond),
+				percentageIncrease(float32(before), float32(after)),
+			)
 		}
 
 		fmt.Println("### " + b.name)
