@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -57,14 +59,19 @@ type benchmark struct {
 	before, after *vegeta.Metrics
 }
 
+var (
+	flagCSV = flag.Bool("csv", false, "output comma seperated values (csv)")
+)
+
 func main() {
 	// Flag parsing.
-	if len(os.Args) <= 2 {
-		fmt.Printf("Usage: %s before/ after/\n", os.Args[0])
+	flag.Parse()
+	if flag.NArg() != 2 {
+		fmt.Printf("Usage: %s [-csv] before/ after/\n", os.Args[0])
 		os.Exit(1)
 	}
-	beforePath := os.Args[1]
-	afterPath := os.Args[2]
+	beforePath := flag.Arg(0)
+	afterPath := flag.Arg(1)
 
 	// Determine filenames (we just blindly assume after/ filenames match
 	// before/ filenames).
@@ -97,6 +104,53 @@ func main() {
 		return benchmarks[i].name < benchmarks[j].name
 	})
 
+	if *flagCSV {
+		writeCSV(benchmarks)
+	} else {
+		writeMarkdown(benchmarks)
+	}
+}
+
+func writeCSV(benchmarks []benchmark) {
+	w := csv.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	// Helper function for formatting the duration difference strings.
+	formatDurationDifference := func(before, after time.Duration) string {
+		return fmt.Sprintf("%v → %v (%.2f%%)",
+			before.Round(time.Millisecond),
+			after.Round(time.Millisecond),
+			percentageIncrease(float32(before), float32(after)),
+		)
+	}
+
+	w.Write([]string{
+		"Name",
+		"Rate",
+		"Duration",
+		"Mean",
+		"P50",
+		"P95",
+		"P99",
+		"Max",
+		"Success",
+	})
+	for _, b := range benchmarks {
+		w.Write([]string{
+			b.name,
+			fmt.Sprint(b.after.Rate),
+			fmt.Sprint(b.after.Duration),
+			formatDurationDifference(b.before.Latencies.Mean, b.after.Latencies.Mean),
+			formatDurationDifference(b.before.Latencies.P50, b.after.Latencies.P50),
+			formatDurationDifference(b.before.Latencies.P95, b.after.Latencies.P95),
+			formatDurationDifference(b.before.Latencies.P99, b.after.Latencies.P99),
+			formatDurationDifference(b.before.Latencies.Max, b.after.Latencies.Max),
+			fmt.Sprintf("%.2f%% → %.2f%%", b.before.Success, b.after.Success),
+		})
+	}
+}
+
+func writeMarkdown(benchmarks []benchmark) {
 	// Go over each file and get and compare the before/after metrics.
 	for _, b := range benchmarks {
 		// Helper function for formatting the duration difference strings.
