@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	vegeta "github.com/tsenart/vegeta/lib"
@@ -51,6 +52,11 @@ func percentageIncrease(before, after float32) float32 {
 	return ((after - before) / before) * 100.0
 }
 
+type benchmark struct {
+	name          string
+	before, after *vegeta.Metrics
+}
+
 func main() {
 	// Flag parsing.
 	if len(os.Args) <= 2 {
@@ -71,22 +77,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Go over each file and get and compare the before/after metrics.
+	// Read, decode, and sort the metrics.
+	var benchmarks []benchmark
 	for _, fi := range fileInfos {
 		if fi.IsDir() {
 			continue
 		}
-
-		// Get the metrics
-		attackName, beforeMetrics, err := attackNameAndMetrics(filepath.Join(beforePath, fi.Name()))
+		name, before, err := attackNameAndMetrics(filepath.Join(beforePath, fi.Name()))
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, afterMetrics, err := attackNameAndMetrics(filepath.Join(afterPath, fi.Name()))
+		_, after, err := attackNameAndMetrics(filepath.Join(afterPath, fi.Name()))
 		if err != nil {
 			log.Fatal(err)
 		}
+		benchmarks = append(benchmarks, benchmark{name, before, after})
+	}
+	sort.Slice(benchmarks, func(i, j int) bool {
+		return benchmarks[i].name < benchmarks[j].name
+	})
 
+	// Go over each file and get and compare the before/after metrics.
+	for _, b := range benchmarks {
 		// Helper function for formatting the duration difference strings.
 		formatDurationDifference := func(before time.Duration, after time.Duration) string {
 			before = before.Round(time.Millisecond)
@@ -94,18 +106,18 @@ func main() {
 			return fmt.Sprintf("%v → %v (%.2f%%)", before, after, percentageIncrease(float32(before), float32(after)))
 		}
 
-		fmt.Println("### " + attackName)
+		fmt.Println("### " + b.name)
 		fmt.Println("")
 		fmt.Println("| Mean | P50 | P95 | P99 | Max | Success Ratio |")
 		fmt.Println("|------|-----|-----|-----|-----|---------------|")
 		fmt.Printf(
 			"| %s | %s | %s | %s | %s | %s |\n",
-			formatDurationDifference(beforeMetrics.Latencies.Mean, afterMetrics.Latencies.Mean),
-			formatDurationDifference(beforeMetrics.Latencies.P50, afterMetrics.Latencies.P50),
-			formatDurationDifference(beforeMetrics.Latencies.P95, afterMetrics.Latencies.P95),
-			formatDurationDifference(beforeMetrics.Latencies.P99, afterMetrics.Latencies.P99),
-			formatDurationDifference(beforeMetrics.Latencies.Max, afterMetrics.Latencies.Max),
-			fmt.Sprintf("%.2f%% → %.2f%%", beforeMetrics.Success, afterMetrics.Success),
+			formatDurationDifference(b.before.Latencies.Mean, b.after.Latencies.Mean),
+			formatDurationDifference(b.before.Latencies.P50, b.after.Latencies.P50),
+			formatDurationDifference(b.before.Latencies.P95, b.after.Latencies.P95),
+			formatDurationDifference(b.before.Latencies.P99, b.after.Latencies.P99),
+			formatDurationDifference(b.before.Latencies.Max, b.after.Latencies.Max),
+			fmt.Sprintf("%.2f%% → %.2f%%", b.before.Success, b.after.Success),
 		)
 		fmt.Println("")
 	}
