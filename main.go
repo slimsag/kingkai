@@ -130,7 +130,7 @@ func main() {
 // 	30.918273ms -> 31ms
 // 	30.918273645s -> 30.9s
 // 	1m30.918273645s -> 91s
-//      38m30.918273645s -> 2311s
+// 	38m30.918273645s -> 2311s
 //
 func smartFormat(d time.Duration) string {
 	if d < time.Second {
@@ -155,31 +155,26 @@ func writeCSV(benchmarks []benchmark) {
 
 	w.Write([]string{
 		"Name",
-		"QPS",
+		"Queries per second",
 		"Duration",
-
-		"Mean before",
-		"Mean after",
 		"Mean change",
-
-		"P50 before",
-		"P50 after",
 		"P50 change",
-
-		"P95 before",
-		"P95 after",
 		"P95 change",
-
-		"P99 before",
-		"P99 after",
 		"P99 change",
-
-		"Max before",
-		"Max after",
 		"Max change",
-
 		"Success before",
 		"Success after",
+		"",
+		"Mean before",
+		"Mean after",
+		"P50 before",
+		"P50 after",
+		"P95 before",
+		"P95 after",
+		"P99 before",
+		"P99 after",
+		"Max before",
+		"Max after",
 	})
 	for _, b := range benchmarks {
 		before := b.before.Latencies
@@ -188,29 +183,24 @@ func writeCSV(benchmarks []benchmark) {
 			b.name,
 			fmt.Sprintf("%.0f", b.after.Rate),
 			b.after.Duration.Round(3 * time.Second).String(), // 1m58.999964907s -> 2m0s
-
-			smartFormat(before.Mean),
-			smartFormat(after.Mean),
 			formatPercentageIncrease(before.Mean, after.Mean),
-
-			smartFormat(before.P50),
-			smartFormat(after.P50),
 			formatPercentageIncrease(before.P50, after.P50),
-
-			smartFormat(before.P95),
-			smartFormat(after.P95),
 			formatPercentageIncrease(before.P95, after.P95),
-
-			smartFormat(before.P99),
-			smartFormat(after.P99),
 			formatPercentageIncrease(before.P99, after.P99),
-
-			smartFormat(before.Max),
-			smartFormat(after.Max),
 			formatPercentageIncrease(before.Max, after.Max),
-
 			fmt.Sprintf("%.1f%%", b.before.Success*100.0),
 			fmt.Sprintf("%.1f%%", b.after.Success*100.0),
+			"",
+			smartFormat(before.Mean),
+			smartFormat(after.Mean),
+			smartFormat(before.P50),
+			smartFormat(after.P50),
+			smartFormat(before.P95),
+			smartFormat(after.P95),
+			smartFormat(before.P99),
+			smartFormat(after.P99),
+			smartFormat(before.Max),
+			smartFormat(after.Max),
 		})
 	}
 }
