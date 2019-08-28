@@ -79,22 +79,36 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fileInfos, err := beforeDir.Readdir(-1)
+	beforeFileInfos, err := beforeDir.Readdir(-1)
 	if err != nil {
 		log.Fatal(err)
+	}
+	afterDir, err := os.Open(afterPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	afterFileInfos, err := afterDir.Readdir(-1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var commonFiles []string
+	for _, before := range beforeFileInfos {
+		for _, after := range afterFileInfos {
+			if !before.IsDir() && !after.IsDir() && before.Name() == after.Name() {
+				commonFiles = append(commonFiles, before.Name())
+				break
+			}
+		}
 	}
 
 	// Read, decode, and sort the metrics.
 	var benchmarks []benchmark
-	for _, fi := range fileInfos {
-		if fi.IsDir() {
-			continue
-		}
-		name, before, err := attackNameAndMetrics(filepath.Join(beforePath, fi.Name()))
+	for _, file := range commonFiles {
+		name, before, err := attackNameAndMetrics(filepath.Join(beforePath, file))
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, after, err := attackNameAndMetrics(filepath.Join(afterPath, fi.Name()))
+		_, after, err := attackNameAndMetrics(filepath.Join(afterPath, file))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -111,41 +125,92 @@ func main() {
 	}
 }
 
+// smartFormat formats a duration as follows:
+//
+// 	30.918273ms -> 31ms
+// 	30.918273645s -> 30.9s
+// 	1m30.918273645s -> 91s
+//      38m30.918273645s -> 2311s
+//
+func smartFormat(d time.Duration) string {
+	if d < time.Second {
+		// 30.918273ms -> 31ms
+		return d.Round(1 * time.Millisecond).String()
+	}
+	if d < time.Minute {
+		// 30.918273645s -> 30.9s
+		return d.Round(100 * time.Millisecond).String()
+	}
+	// 1m30.918273645s -> 91s
+	return fmt.Sprintf("%.0fs", d.Seconds())
+}
+
 func writeCSV(benchmarks []benchmark) {
 	w := csv.NewWriter(os.Stdout)
 	defer w.Flush()
 
-	// Helper function for formatting the duration difference strings.
-	formatDurationDifference := func(before, after time.Duration) string {
-		return fmt.Sprintf("%v → %v (%.2f%%)",
-			before.Round(time.Millisecond),
-			after.Round(time.Millisecond),
-			percentageIncrease(float32(before), float32(after)),
-		)
+	formatPercentageIncrease := func(before, after time.Duration) string {
+		return fmt.Sprintf("%.0f%%", percentageIncrease(float32(before), float32(after)))
 	}
 
 	w.Write([]string{
 		"Name",
-		"Rate",
+		"QPS",
 		"Duration",
-		"Mean",
-		"P50",
-		"P95",
-		"P99",
-		"Max",
-		"Success",
+
+		"Mean before",
+		"Mean after",
+		"Mean change",
+
+		"P50 before",
+		"P50 after",
+		"P50 change",
+
+		"P95 before",
+		"P95 after",
+		"P95 change",
+
+		"P99 before",
+		"P99 after",
+		"P99 change",
+
+		"Max before",
+		"Max after",
+		"Max change",
+
+		"Success before",
+		"Success after",
 	})
 	for _, b := range benchmarks {
+		before := b.before.Latencies
+		after := b.after.Latencies
 		w.Write([]string{
 			b.name,
-			fmt.Sprint(b.after.Rate),
-			fmt.Sprint(b.after.Duration),
-			formatDurationDifference(b.before.Latencies.Mean, b.after.Latencies.Mean),
-			formatDurationDifference(b.before.Latencies.P50, b.after.Latencies.P50),
-			formatDurationDifference(b.before.Latencies.P95, b.after.Latencies.P95),
-			formatDurationDifference(b.before.Latencies.P99, b.after.Latencies.P99),
-			formatDurationDifference(b.before.Latencies.Max, b.after.Latencies.Max),
-			fmt.Sprintf("%.2f%% → %.2f%%", b.before.Success, b.after.Success),
+			fmt.Sprintf("%.0f", b.after.Rate),
+			b.after.Duration.Round(3 * time.Second).String(), // 1m58.999964907s -> 2m0s
+
+			smartFormat(before.Mean),
+			smartFormat(after.Mean),
+			formatPercentageIncrease(before.Mean, after.Mean),
+
+			smartFormat(before.P50),
+			smartFormat(after.P50),
+			formatPercentageIncrease(before.P50, after.P50),
+
+			smartFormat(before.P95),
+			smartFormat(after.P95),
+			formatPercentageIncrease(before.P95, after.P95),
+
+			smartFormat(before.P99),
+			smartFormat(after.P99),
+			formatPercentageIncrease(before.P99, after.P99),
+
+			smartFormat(before.Max),
+			smartFormat(after.Max),
+			formatPercentageIncrease(before.Max, after.Max),
+
+			fmt.Sprintf("%.1f%%", b.before.Success*100.0),
+			fmt.Sprintf("%.1f%%", b.after.Success*100.0),
 		})
 	}
 }
