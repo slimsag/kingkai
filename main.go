@@ -47,7 +47,7 @@ func attackNameAndMetrics(filepath string) (string, *vegeta.Metrics, error) {
 }
 
 // percentageIncrease calculates the percentage increase between two numbers.
-func percentageIncrease(before, after float32) float32 {
+func percentageIncrease(before, after float64) float64 {
 	if before == 0 {
 		return 0
 	}
@@ -150,13 +150,19 @@ func writeCSV(benchmarks []benchmark) {
 	defer w.Flush()
 
 	formatPercentageIncrease := func(before, after time.Duration) string {
-		return fmt.Sprintf("%.0f%%", percentageIncrease(float32(before), float32(after)))
+		return fmt.Sprintf("%.0f%%", percentageIncrease(float64(before), float64(after)))
+	}
+	formatPercentageIncreaseFloat := func(before, after float64) string {
+		return fmt.Sprintf("%.0f%%", percentageIncrease(before, after))
 	}
 
 	w.Write([]string{
 		"Name",
 		"Queries per second",
 		"Duration",
+		"Mean bytes sent change",
+		"Mean bytes received change",
+		"Throughput",
 		"Mean change",
 		"P50 change",
 		"P95 change",
@@ -175,6 +181,16 @@ func writeCSV(benchmarks []benchmark) {
 		"P99 after",
 		"Max before",
 		"Max after",
+		"Throughput before",
+		"Throughput after",
+		"Total sent bytes before",
+		"Total sent bytes after",
+		"Mean sent bytes before",
+		"Mean sent bytes after",
+		"Total received bytes before",
+		"Total received bytes after",
+		"Mean received bytes before",
+		"Mean received bytes after",
 	})
 	for _, b := range benchmarks {
 		before := b.before.Latencies
@@ -183,6 +199,9 @@ func writeCSV(benchmarks []benchmark) {
 			b.name,
 			fmt.Sprintf("%.0f", b.after.Rate),
 			b.after.Duration.Round(3 * time.Second).String(), // 1m58.999964907s -> 2m0s
+			formatPercentageIncreaseFloat(b.before.BytesOut.Mean, b.after.BytesOut.Mean),
+			formatPercentageIncreaseFloat(b.before.BytesIn.Mean, b.after.BytesIn.Mean),
+			formatPercentageIncreaseFloat(b.before.Throughput, b.after.Throughput),
 			formatPercentageIncrease(before.Mean, after.Mean),
 			formatPercentageIncrease(before.P50, after.P50),
 			formatPercentageIncrease(before.P95, after.P95),
@@ -201,6 +220,19 @@ func writeCSV(benchmarks []benchmark) {
 			smartFormat(after.P99),
 			smartFormat(before.Max),
 			smartFormat(after.Max),
+
+			fmt.Sprint(b.before.Throughput),
+			fmt.Sprint(b.after.Throughput),
+
+			fmt.Sprint(b.before.BytesOut.Total),
+			fmt.Sprint(b.after.BytesOut.Total),
+			fmt.Sprint(b.before.BytesOut.Mean),
+			fmt.Sprint(b.after.BytesOut.Mean),
+
+			fmt.Sprint(b.before.BytesIn.Total),
+			fmt.Sprint(b.after.BytesIn.Total),
+			fmt.Sprint(b.before.BytesIn.Mean),
+			fmt.Sprint(b.after.BytesIn.Mean),
 		})
 	}
 }
@@ -213,7 +245,7 @@ func writeMarkdown(benchmarks []benchmark) {
 			return fmt.Sprintf("%v → %v (%.2f%%)",
 				before.Round(time.Millisecond),
 				after.Round(time.Millisecond),
-				percentageIncrease(float32(before), float32(after)),
+				percentageIncrease(float64(before), float64(after)),
 			)
 		}
 
